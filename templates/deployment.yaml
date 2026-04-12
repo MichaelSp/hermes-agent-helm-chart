@@ -230,9 +230,9 @@ spec:
           ports:
             {{- if $serviceEnabled }}
             {{- range $i, $port := $servicePorts }}
-            - name: {{ default (printf "port-%d" $i) $port.name }}
-              containerPort: {{- if hasKey $port "containerPort" }} {{ $port.containerPort | int }}{{- else if and (hasKey $port "targetPort") (not (kindIs "string" $port.targetPort)) }} {{ $port.targetPort | int }}{{- else }} {{ $port.port | int }}{{- end }}
-              protocol: {{ default "TCP" $port.protocol }}
+            - name: {{ default (printf "port-%d" $i) (get $port "name") }}
+              containerPort: {{- if hasKey $port "containerPort" }} {{ get $port "containerPort" | int }}{{- else if and (hasKey $port "targetPort") (not (kindIs "string" (get $port "targetPort"))) }} {{ get $port "targetPort" | int }}{{- else }} {{ get $port "port" | int }}{{- end }}
+              protocol: {{ default "TCP" (get $port "protocol") }}
             {{- end }}
             {{- else if $apiServerEnabled }}
             - name: api-server

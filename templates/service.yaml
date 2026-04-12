@@ -31,14 +31,14 @@ spec:
   {{- end }}
   ports:
     {{- range $i, $port := $servicePorts }}
-    - name: {{ default (printf "port-%d" $i) $port.name }}
-      port: {{ $port.port }}
-      targetPort: {{ default $port.port $port.targetPort }}
-      protocol: {{ default "TCP" $port.protocol }}
-      {{- with $port.appProtocol }}
+    - name: {{ default (printf "port-%d" $i) (get $port "name") }}
+      port: {{ get $port "port" }}
+      targetPort: {{ default (get $port "port") (get $port "targetPort") }}
+      protocol: {{ default "TCP" (get $port "protocol") }}
+      {{- with (get $port "appProtocol") }}
       appProtocol: {{ . | quote }}
       {{- end }}
-      {{- with $port.nodePort }}
+      {{- with (get $port "nodePort") }}
       nodePort: {{ . }}
       {{- end }}
     {{- end }}

@@ -81,7 +81,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- define "hermes-agent.primaryServicePortNumber" -}}
 {{- $servicePorts := include "hermes-agent.servicePorts" . | fromJson -}}
 {{- if and .Values.service.enabled (gt (len $servicePorts) 0) -}}
-{{- (index $servicePorts 0).port -}}
+{{- get (index $servicePorts 0) "port" -}}
 {{- else -}}
 {{- fail "service.enabled=true with either explicit service.ports entries or enabled apiServer/webhook/telegramWebhook ports is required for ingress or virtualService routing" -}}
 {{- end -}}
