@@ -60,19 +60,26 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-data" (include "hermes-agent.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
-{{- define "hermes-agent.primaryServicePortNumber" -}}
-{{- $servicePorts := .Values.service.ports -}}
-{{- if eq (len $servicePorts) 0 -}}
+{{- define "hermes-agent.servicePorts" -}}
+{{- $ports := list -}}
+{{- if gt (len .Values.service.ports) 0 -}}
+  {{- $ports = .Values.service.ports -}}
+{{- else -}}
   {{- if .Values.apiServer.enabled -}}
-    {{- $servicePorts = append $servicePorts (dict "name" "api-server" "port" (.Values.apiServer.port | int) "targetPort" (.Values.apiServer.port | int) "containerPort" (.Values.apiServer.port | int) "protocol" "TCP") -}}
+    {{- $ports = append $ports (dict "name" "api-server" "port" (.Values.apiServer.port | int) "targetPort" (.Values.apiServer.port | int) "containerPort" (.Values.apiServer.port | int) "protocol" "TCP") -}}
   {{- end -}}
   {{- if .Values.webhook.enabled -}}
-    {{- $servicePorts = append $servicePorts (dict "name" "webhook" "port" (.Values.webhook.port | int) "targetPort" (.Values.webhook.port | int) "containerPort" (.Values.webhook.port | int) "protocol" "TCP") -}}
+    {{- $ports = append $ports (dict "name" "webhook" "port" (.Values.webhook.port | int) "targetPort" (.Values.webhook.port | int) "containerPort" (.Values.webhook.port | int) "protocol" "TCP") -}}
   {{- end -}}
   {{- if .Values.telegramWebhook.enabled -}}
-    {{- $servicePorts = append $servicePorts (dict "name" "telegram-webhook" "port" (.Values.telegramWebhook.port | int) "targetPort" (.Values.telegramWebhook.port | int) "containerPort" (.Values.telegramWebhook.port | int) "protocol" "TCP") -}}
+    {{- $ports = append $ports (dict "name" "telegram-webhook" "port" (.Values.telegramWebhook.port | int) "targetPort" (.Values.telegramWebhook.port | int) "containerPort" (.Values.telegramWebhook.port | int) "protocol" "TCP") -}}
   {{- end -}}
 {{- end -}}
+{{- $ports | toJson -}}
+{{- end -}}
+
+{{- define "hermes-agent.primaryServicePortNumber" -}}
+{{- $servicePorts := include "hermes-agent.servicePorts" . | fromJson -}}
 {{- if and .Values.service.enabled (gt (len $servicePorts) 0) -}}
 {{- (index $servicePorts 0).port -}}
 {{- else -}}
