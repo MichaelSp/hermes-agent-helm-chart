@@ -144,9 +144,4 @@ helm lint . -f ci/existing-claim-values.yaml
 helm template hermes .
 helm template hermes . -f ci/test-values.yaml
 helm template hermes . -f ci/existing-claim-values.yaml
-
-# schema-focused negative checks
-! helm lint . -f ci/invalid-persistence-values.yaml
-! helm lint . -f ci/invalid-service-values.yaml
-! helm lint . -f ci/invalid-telegram-values.yaml
 ```
