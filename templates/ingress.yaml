@@ -2,8 +2,9 @@
 {{- if not .Values.service.enabled }}
 {{- fail "ingress.enabled=true requires service.enabled=true" }}
 {{- end }}
-{{- if eq (len .Values.service.ports) 0 }}
-{{- fail "ingress.enabled=true requires at least one entry in service.ports" }}
+{{- $servicePorts := include "hermes-agent.servicePorts" . | fromJson }}
+{{- if eq (len $servicePorts) 0 }}
+{{- fail "ingress.enabled=true requires either explicit service.ports entries or enabled apiServer/webhook/telegramWebhook ports" }}
 {{- end }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress

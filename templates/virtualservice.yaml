@@ -2,8 +2,9 @@
 {{- if not .Values.service.enabled }}
 {{- fail "virtualService.enabled=true requires service.enabled=true" }}
 {{- end }}
-{{- if eq (len .Values.service.ports) 0 }}
-{{- fail "virtualService.enabled=true requires at least one entry in service.ports" }}
+{{- $servicePorts := include "hermes-agent.servicePorts" . | fromJson }}
+{{- if eq (len $servicePorts) 0 }}
+{{- fail "virtualService.enabled=true requires either explicit service.ports entries or enabled apiServer/webhook/telegramWebhook ports" }}
 {{- end }}
 {{- if eq (len .Values.virtualService.gateways) 0 }}
 {{- fail "virtualService.enabled=true requires at least one entry in virtualService.gateways" }}
