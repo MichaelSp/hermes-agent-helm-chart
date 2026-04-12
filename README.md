@@ -2,93 +2,121 @@
 
 Cloud-native Helm chart for [Nous Research's Hermes Agent](https://github.com/nousresearch/hermes-agent).
 
-This chart keeps Hermes's mutable state in a PVC at `/opt/data`, injects secrets as environment variables, and bootstraps a Helm-managed `config.yaml` before the main process starts.
+This chart combines the strongest ideas from the reference repos:
+
+- **state-safe rollout defaults** for Hermes's mutable `HERMES_HOME`
+- **generic Kubernetes composition hooks** so the chart can plug into other releases
+- **optional cloud-native surfaces** like Service, Ingress, Istio `VirtualService`, RBAC, PDB, and NetworkPolicy
+- **Hermes-specific runtime support** for config bootstrapping, browser `/dev/shm`, and npm-based skill dependencies
 
 ## What this chart optimizes for
 
-- **Persistent Hermes state** in one volume: sessions, memories, skills, logs, cron jobs, and config
-- **Gateway-first deployments** with `hermes gateway run` as the default runtime
-- **Optional API server exposure** for OpenAI-compatible frontends
-- **Cloud-native ergonomics**: service account, optional network policy, PDB, probes, and checksum-based rollouts
-- **Hermes image compatibility** with `/dev/shm` sizing and optional npm package bootstrap
+- Persistent Hermes state in one PVC-backed home directory
+- A single-replica `Deployment` with `Recreate` strategy to avoid PVC corruption
+- Gateway-first runtime (`hermes gateway run`) with optional API server / webhook exposure
+- Secure-by-default pod and container security contexts
+- Easy composition with arbitrary Kubernetes charts and external operators
 
 ## Install
 
 ```bash
-helm install hermes . \
-  --set secrets.OPENROUTER_API_KEY=sk-or-... \
-  --set config.values.model.default=anthropic/claude-sonnet-4.6
+helm install hermes .
 ```
 
-For a browser-friendly HTTP frontend:
-
-```bash
-helm install hermes . \
-  --set apiServer.enabled=true \
-  --set secrets.OPENROUTER_API_KEY=sk-or-... \
-  --set secrets.API_SERVER_KEY=change-me \
-  --set ingress.enabled=true \
-  --set ingress.hosts[0].host=hermes.example.com
-```
-
-## Important paths
-
-- **`/opt/data`** — authoritative Hermes home directory (`HERMES_HOME`)
-- **`/opt/data/config.yaml`** — Helm-managed config bootstrap
-- **`/opt/data/SOUL.md`** — optional chart-managed persona file
-- **`/dev/shm`** — memory-backed shared memory mount for browser tools
-
-## Runtime model
-
-By default the chart runs:
-
-```bash
-hermes gateway run
-```
-
-You can override the runtime with `args`, for example:
+Minimal example:
 
 ```yaml
-args: ["acp"]
+secrets:
+  OPENROUTER_API_KEY: sk-or-...
+
+config:
+  values:
+    model:
+      default: anthropic/claude-opus-4.6
 ```
 
-## Values
+## OpenAI-compatible API server
 
-### Core
+Enable Hermes's OpenAI-compatible server for Open WebUI / LobeChat / LibreChat style frontends:
 
-- `image.repository`, `image.tag`, `image.pullPolicy`
-- `replicaCount` — default `1`
-- `args` — Hermes CLI arguments passed after the built-in entrypoint
-- `persistence.*`
-- `bootstrap.*`
-- `config.*`
-- `secrets.*`
-- `env.*`
-- `serviceAccount.*`
-- `resources`
-- `shmSize`
+```yaml
+apiServer:
+  enabled: true
+  host: 0.0.0.0
+  port: 8642
 
-### Exposure
+secrets:
+  OPENROUTER_API_KEY: sk-or-...
+  API_SERVER_KEY: change-me
 
-- `apiServer.enabled`
-- `service.enabled`
-- `service.type`
-- `ingress.enabled`
-- `ingress.hosts`
-- `networkPolicy.enabled`
+service:
+  enabled: true
+  ports:
+    - name: api-server
+      port: 8642
+      targetPort: 8642
+      containerPort: 8642
+```
 
-### Extensibility
+## Webhooks and Telegram webhook mode
 
-- `npmPackages` — install npm packages into `/opt/data/npm-global`
-- `extraEnv`, `extraEnvFrom`
-- `extraInitContainers`, `extraContainers`
-- `extraVolumes`, `extraVolumeMounts`
+The chart also supports Hermes's webhook adapters:
+
+```yaml
+webhook:
+  enabled: true
+  port: 8644
+
+telegramWebhook:
+  enabled: true
+  url: https://hermes.example.com/telegram
+  port: 8443
+
+service:
+  enabled: true
+  ports:
+    - name: api-server
+      port: 8642
+      targetPort: 8642
+      containerPort: 8642
+    - name: webhook
+      port: 8644
+      targetPort: 8644
+      containerPort: 8644
+    - name: telegram-webhook
+      port: 8443
+      targetPort: 8443
+      containerPort: 8443
+```
+
+## Compose with any Kubernetes chart
+
+This chart is intentionally open-ended so it can integrate with other Helm charts and platform operators without forking:
+
+- `secrets.existingSecret` — consume credentials managed by External Secrets, Vault, Sealed Secrets, or another chart
+- `persistence.existingClaim` — reuse storage created elsewhere
+- `extraEnvFrom` — import ConfigMaps/Secrets produced by another release
+- `extraVolumes` / `extraVolumeMounts` — attach config, credentials, or shared storage from other workloads
+- `extraInitContainers` / `extraContainers` — add sidecars, bootstrap jobs, or service mesh helpers
+- `extraObjects` — inject arbitrary manifests such as `ExternalSecret`, `ServiceMonitor`, or policy resources
+- `serviceAccount.annotations` — attach IRSA / Workload Identity / cloud IAM integration
 
 ## Operational notes
 
-- Keep `replicaCount` at `1` when persistence is enabled.
-- Helm values are the source of truth for `config.yaml`.
-- Use `secrets.existingSecret` if you manage credentials outside Helm.
-- Enable `apiServer.enabled` only with an `API_SERVER_KEY`.
-- For browser tools, keep `shmSize` at least `1Gi`.
+- Keep `replicaCount: 1` when persistence is enabled.
+- Hermes state lives under `persistence.mountPath` (`/opt/data` by default).
+- `bootstrap.overwrite=true` makes Helm the source of truth for `config.yaml` and `SOUL.md`.
+- `npmPackages` installs packages into the PVC and exposes them via `PATH`/`NODE_PATH`.
+- Enable `service.enabled` only when you actually want network exposure.
+- Enable `rbac.create` only when Hermes needs in-cluster Kubernetes access.
 
+## Verification
+
+This repo includes `ci/test-values.yaml` for render checks:
+
+```bash
+helm lint .
+helm lint . -f ci/test-values.yaml
+helm template hermes .
+helm template hermes . -f ci/test-values.yaml
+```

@@ -1,7 +1,10 @@
-{{- if .Values.ingress.enabled -}}
-{{- if not .Values.service.enabled -}}
-{{- fail "ingress.enabled=true requires service.enabled=true and at least one service.ports entry" -}}
-{{- end -}}
+{{- if .Values.ingress.enabled }}
+{{- if not .Values.service.enabled }}
+{{- fail "ingress.enabled=true requires service.enabled=true" }}
+{{- end }}
+{{- if eq (len .Values.service.ports) 0 }}
+{{- fail "ingress.enabled=true requires at least one entry in service.ports" }}
+{{- end }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -16,15 +19,9 @@ spec:
   {{- if .Values.ingress.className }}
   ingressClassName: {{ .Values.ingress.className }}
   {{- end }}
-  {{- if .Values.ingress.tls }}
+  {{- with .Values.ingress.tls }}
   tls:
-    {{- range .Values.ingress.tls }}
-    - hosts:
-        {{- range .hosts }}
-        - {{ . | quote }}
-        {{- end }}
-      secretName: {{ .secretName }}
-    {{- end }}
+    {{- toYaml . | nindent 4 }}
   {{- end }}
   rules:
     {{- range .Values.ingress.hosts }}
@@ -32,13 +29,14 @@ spec:
       http:
         paths:
           {{- range .paths }}
+          {{- $defaultPort := default (include "hermes-agent.primaryServicePortNumber" $) $.Values.ingress.servicePortNumber }}
           - path: {{ .path }}
             pathType: {{ .pathType }}
             backend:
               service:
                 name: {{ include "hermes-agent.fullname" $ }}
                 port:
-                  number: {{ default (include "hermes-agent.primaryServicePortNumber" $) $.Values.ingress.servicePortNumber }}
+                  number: {{ default $defaultPort .servicePortNumber }}
           {{- end }}
     {{- end }}
-{{- end -}}
+{{- end }}

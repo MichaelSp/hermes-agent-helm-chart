@@ -56,11 +56,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-data" (include "hermes-agent.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
-{{- define "hermes-agent.servicePort" -}}
-{{- default .Values.apiServer.port .Values.service.port -}}
+{{- define "hermes-agent.primaryServicePortNumber" -}}
+{{- if and .Values.service.enabled (gt (len .Values.service.ports) 0) -}}
+{{- (index .Values.service.ports 0).port -}}
+{{- else -}}
+{{- fail "service.enabled=true with at least one service.ports entry is required for ingress or virtualService routing" -}}
 {{- end -}}
-
-{{- define "hermes-agent.bootstrapUsesSoul" -}}
-{{- if .Values.soul.text -}}true{{- else -}}false{{- end -}}
 {{- end -}}
-

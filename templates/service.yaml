@@ -1,7 +1,7 @@
-{{- if .Values.service.enabled -}}
-{{- if eq (len .Values.service.ports) 0 -}}
-{{- fail "service.enabled=true requires at least one port in service.ports" -}}
-{{- end -}}
+{{- if .Values.service.enabled }}
+{{- if eq (len .Values.service.ports) 0 }}
+{{- fail "service.enabled=true requires at least one entry in service.ports" }}
+{{- end }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -18,18 +18,29 @@ metadata:
 spec:
   type: {{ .Values.service.type }}
   sessionAffinity: {{ .Values.service.sessionAffinity }}
-  {{- if eq .Values.service.type "LoadBalancer" }}
+  {{- if and (eq .Values.service.type "LoadBalancer") (gt (len .Values.service.loadBalancerSourceRanges) 0) }}
   loadBalancerSourceRanges:
     {{- toYaml .Values.service.loadBalancerSourceRanges | nindent 4 }}
   {{- end }}
-  {{- if .Values.service.externalTrafficPolicy }}
+  {{- if and (or (eq .Values.service.type "LoadBalancer") (eq .Values.service.type "NodePort")) .Values.service.externalTrafficPolicy }}
   externalTrafficPolicy: {{ .Values.service.externalTrafficPolicy }}
   {{- end }}
-  {{- if .Values.service.internalTrafficPolicy }}
+  {{- if and (ne .Values.service.type "ExternalName") .Values.service.internalTrafficPolicy }}
   internalTrafficPolicy: {{ .Values.service.internalTrafficPolicy }}
   {{- end }}
   ports:
-    {{- toYaml .Values.service.ports | nindent 4 }}
+    {{- range $i, $port := .Values.service.ports }}
+    - name: {{ default (printf "port-%d" $i) $port.name }}
+      port: {{ $port.port }}
+      targetPort: {{ default $port.port $port.targetPort }}
+      protocol: {{ default "TCP" $port.protocol }}
+      {{- with $port.appProtocol }}
+      appProtocol: {{ . | quote }}
+      {{- end }}
+      {{- with $port.nodePort }}
+      nodePort: {{ . }}
+      {{- end }}
+    {{- end }}
   selector:
     {{- include "hermes-agent.selectorLabels" . | nindent 4 }}
-{{- end -}}
+{{- end }}

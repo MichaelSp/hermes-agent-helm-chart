@@ -1,13 +1,20 @@
 {{- $replicas := int .Values.replicaCount -}}
-{{- if and (gt $replicas 1) .Values.persistence.enabled -}}
-{{- fail "Hermes Agent supports only one replica when persistence.enabled=true because /opt/data contains mutable shared state" -}}
-{{- end -}}
-{{- if and .Values.apiServer.enabled (not .Values.secrets.existingSecret) (eq (printf "%v" .Values.secrets.API_SERVER_KEY) "") -}}
-{{- fail "apiServer.enabled requires secrets.API_SERVER_KEY when secrets.existingSecret is not set" -}}
-{{- end -}}
-{{- $serviceEnabled := or .Values.service.enabled .Values.apiServer.enabled -}}
-{{- $servicePort := include "hermes-agent.servicePort" . | int -}}
+{{- $mountPath := .Values.persistence.mountPath -}}
+{{- $serviceEnabled := .Values.service.enabled -}}
+{{- $apiServerEnabled := .Values.apiServer.enabled -}}
 {{- $npmEnabled := gt (len .Values.npmPackages) 0 -}}
+{{- $hasGeneratedSecret := false -}}
+{{- range $key, $value := .Values.secrets }}
+  {{- if and (ne $key "existingSecret") (ne $key "annotations") (ne (printf "%v" $value) "") -}}
+    {{- $hasGeneratedSecret = true -}}
+  {{- end -}}
+{{- end -}}
+{{- if and (gt $replicas 1) .Values.persistence.enabled }}
+{{- fail "Hermes Agent supports only one replica when persistence.enabled=true because HERMES_HOME contains mutable shared state" }}
+{{- end }}
+{{- if and $apiServerEnabled (not .Values.secrets.existingSecret) (eq (printf "%v" .Values.secrets.API_SERVER_KEY) "") }}
+{{- fail "apiServer.enabled requires secrets.API_SERVER_KEY when secrets.existingSecret is not set" }}
+{{- end }}
 {{- $npmHash := "" -}}
 {{- if $npmEnabled -}}
 {{- $npmHash = sha256sum (join "," .Values.npmPackages) -}}
@@ -50,12 +57,19 @@ spec:
     spec:
       serviceAccountName: {{ include "hermes-agent.serviceAccountName" . }}
       automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      {{- with .Values.runtimeClassName }}
+      runtimeClassName: {{ . }}
+      {{- end }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if or .Values.bootstrap.enabled $npmEnabled .Values.extraInitContainers }}
       initContainers:
         {{- if .Values.bootstrap.enabled }}
         - name: bootstrap-config
@@ -67,28 +81,30 @@ spec:
           args:
             - |
               set -eu
-              mkdir -p /opt/data/home
+              mkdir -p {{ printf "%s/home" $mountPath | quote }}
               if [ -f /bootstrap/config.yaml ]; then
-                if [ "{{ $overwrite }}" = "true" ] || [ ! -f /opt/data/config.yaml ]; then
-                  cp /bootstrap/config.yaml /opt/data/config.yaml
+                if [ "{{ $overwrite }}" = "true" ] || [ ! -f {{ printf "%s/config.yaml" $mountPath | quote }} ]; then
+                  cp /bootstrap/config.yaml {{ printf "%s/config.yaml" $mountPath | quote }}
                 fi
               fi
               {{- if .Values.soul.text }}
               if [ -f /bootstrap/SOUL.md ]; then
-                if [ "{{ $overwrite }}" = "true" ] || [ ! -f /opt/data/SOUL.md ]; then
-                  cp /bootstrap/SOUL.md /opt/data/SOUL.md
+                if [ "{{ $overwrite }}" = "true" ] || [ ! -f {{ printf "%s/SOUL.md" $mountPath | quote }} ]; then
+                  cp /bootstrap/SOUL.md {{ printf "%s/SOUL.md" $mountPath | quote }}
                 fi
               fi
               {{- end }}
           env:
             - name: HERMES_HOME
-              value: /opt/data
+              value: {{ $mountPath | quote }}
           volumeMounts:
             - name: data
-              mountPath: /opt/data
+              mountPath: {{ $mountPath }}
             - name: bootstrap
               mountPath: /bootstrap
               readOnly: true
+            - name: tmp
+              mountPath: /tmp
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
         {{- end }}
@@ -102,54 +118,62 @@ spec:
           args:
             - |
               set -eu
-              mkdir -p /opt/data/home /opt/data/npm-global
-              hash_file="/opt/data/npm-global/.helm-npm-packages-hash"
+              mkdir -p {{ printf "%s/home" $mountPath | quote }} {{ printf "%s/npm-global" $mountPath | quote }}
+              hash_file={{ printf "%s/npm-global/.helm-npm-packages-hash" $mountPath | quote }}
               desired_hash="{{ $npmHash }}"
               current_hash=""
               if [ -f "$hash_file" ]; then
                 current_hash="$(cat "$hash_file" 2>/dev/null || true)"
               fi
               if [ "$current_hash" != "$desired_hash" ]; then
-                npm install --global --prefix /opt/data/npm-global {{- range .Values.npmPackages }} {{ . | quote }}{{- end }}
+                npm install --global --prefix {{ printf "%s/npm-global" $mountPath | quote }}{{- range .Values.npmPackages }} {{ . | quote }}{{- end }}
                 npm cache clean --force || true
                 printf '%s\n' "$desired_hash" > "$hash_file"
               fi
           env:
             - name: HOME
-              value: /opt/data/home
+              value: {{ printf "%s/home" $mountPath | quote }}
           volumeMounts:
             - name: data
-              mountPath: /opt/data
+              mountPath: {{ $mountPath }}
+            - name: tmp
+              mountPath: /tmp
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
         {{- end }}
         {{- with .Values.extraInitContainers }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+      {{- end }}
       containers:
         - name: hermes-agent
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           args:
             {{- toYaml .Values.args | nindent 12 }}
+          workingDir: {{ .Values.workingDir }}
           env:
             - name: HERMES_HOME
-              value: /opt/data
+              value: {{ $mountPath | quote }}
             - name: HOME
-              value: /opt/data/home
+              value: {{ printf "%s/home" $mountPath | quote }}
             {{- if $npmEnabled }}
             - name: PATH
-              value: /opt/data/npm-global/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+              value: {{ printf "%s/npm-global/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" $mountPath | quote }}
             - name: NODE_PATH
-              value: /opt/data/npm-global/lib/node_modules
+              value: {{ printf "%s/npm-global/lib/node_modules" $mountPath | quote }}
             - name: NPM_CONFIG_PREFIX
-              value: /opt/data/npm-global
+              value: {{ printf "%s/npm-global" $mountPath | quote }}
             {{- end }}
             {{- range $key, $value := .Values.env }}
             - name: {{ $key }}
               value: {{ printf "%v" $value | quote }}
             {{- end }}
-            {{- if .Values.apiServer.enabled }}
+            {{- if $apiServerEnabled }}
             - name: API_SERVER_ENABLED
               value: "true"
             - name: API_SERVER_HOST
@@ -161,50 +185,60 @@ spec:
             - name: API_SERVER_MODEL_NAME
               value: {{ .Values.apiServer.modelName | quote }}
             {{- end }}
-          {{- if .Values.secrets.existingSecret }}
+            {{- if .Values.webhook.enabled }}
+            - name: WEBHOOK_ENABLED
+              value: "true"
+            - name: WEBHOOK_PORT
+              value: {{ .Values.webhook.port | quote }}
+            {{- end }}
+            {{- if .Values.telegramWebhook.enabled }}
+            - name: TELEGRAM_WEBHOOK_URL
+              value: {{ .Values.telegramWebhook.url | quote }}
+            - name: TELEGRAM_WEBHOOK_PORT
+              value: {{ .Values.telegramWebhook.port | quote }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- if or .Values.secrets.existingSecret .Values.extraEnvFrom $hasGeneratedSecret }}
           envFrom:
+            {{- if .Values.secrets.existingSecret }}
             - secretRef:
                 name: {{ .Values.secrets.existingSecret }}
-          {{- else }}
-          envFrom:
+            {{- else }}
             - secretRef:
                 name: {{ include "hermes-agent.secretName" . }}
                 optional: true
+            {{- end }}
+            {{- with .Values.extraEnvFrom }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- end }}
+          {{- if or $serviceEnabled $apiServerEnabled }}
           ports:
             {{- if $serviceEnabled }}
-            - name: http
-              containerPort: {{ $servicePort }}
+            {{- range $i, $port := .Values.service.ports }}
+            - name: {{ default (printf "port-%d" $i) $port.name }}
+              containerPort: {{- if hasKey $port "containerPort" }} {{ $port.containerPort | int }}{{- else if and (hasKey $port "targetPort") (not (kindIs "string" $port.targetPort)) }} {{ $port.targetPort | int }}{{- else }} {{ $port.port | int }}{{- end }}
+              protocol: {{ default "TCP" $port.protocol }}
+            {{- end }}
+            {{- else if $apiServerEnabled }}
+            - name: api-server
+              containerPort: {{ .Values.apiServer.port }}
               protocol: TCP
             {{- end }}
-          {{- if and .Values.apiServer.enabled .Values.probes.enabled }}
+          {{- end }}
+          {{- with .Values.probes.liveness }}
           livenessProbe:
-            httpGet:
-              path: /health
-              port: http
-            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
-            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
-            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
-            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
-            successThreshold: {{ .Values.probes.liveness.successThreshold }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.probes.readiness }}
           readinessProbe:
-            httpGet:
-              path: /health
-              port: http
-            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
-            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
-            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
-            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
-            successThreshold: {{ .Values.probes.readiness.successThreshold }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.probes.startup }}
           startupProbe:
-            httpGet:
-              path: /health
-              port: http
-            initialDelaySeconds: {{ .Values.probes.startup.initialDelaySeconds }}
-            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
-            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
-            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
-            successThreshold: {{ .Values.probes.startup.successThreshold }}
+            {{- toYaml . | nindent 12 }}
           {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
@@ -212,9 +246,13 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           volumeMounts:
             - name: data
-              mountPath: /opt/data
+              mountPath: {{ $mountPath }}
+            - name: tmp
+              mountPath: /tmp
+            {{- if .Values.browser.shm.enabled }}
             - name: dshm
-              mountPath: /dev/shm
+              mountPath: {{ .Values.browser.shm.mountPath }}
+            {{- end }}
             {{- with .Values.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -225,17 +263,21 @@ spec:
         - name: data
           {{- if .Values.persistence.enabled }}
           persistentVolumeClaim:
-            claimName: {{ include "hermes-agent.pvcName" . }}
+            claimName: {{ default (include "hermes-agent.pvcName" .) .Values.persistence.existingClaim }}
           {{- else }}
           emptyDir: {}
           {{- end }}
         - name: bootstrap
           configMap:
             name: {{ include "hermes-agent.configMapName" . }}
+        - name: tmp
+          emptyDir: {}
+        {{- if .Values.browser.shm.enabled }}
         - name: dshm
           emptyDir:
             medium: Memory
-            sizeLimit: {{ .Values.shmSize | quote }}
+            sizeLimit: {{ .Values.browser.shm.sizeLimit | quote }}
+        {{- end }}
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -252,4 +294,7 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
