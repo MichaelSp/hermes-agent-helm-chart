@@ -1,7 +1,7 @@
 {{- if .Values.service.enabled }}
-{{- $servicePorts := include "hermes-agent.servicePorts" . | fromJson }}
-{{- if eq (len $servicePorts) 0 }}
-{{- fail "service.enabled=true requires either at least one entry in service.ports or an enabled apiServer/webhook/telegramWebhook port to expose" }}
+{{- $ports := include "hermes-agent.effectiveServicePorts" . | fromYamlArray -}}
+{{- if eq (len $ports) 0 }}
+{{- fail "service.enabled=true requires at least one service.ports entry or an enabled apiServer/webhook/telegramWebhook port to expose" }}
 {{- end }}
 apiVersion: v1
 kind: Service
@@ -30,12 +30,12 @@ spec:
   internalTrafficPolicy: {{ .Values.service.internalTrafficPolicy }}
   {{- end }}
   ports:
-    {{- range $i, $port := $servicePorts }}
-    - name: {{ default (printf "port-%d" $i) (get $port "name") }}
-      port: {{ get $port "port" }}
-      targetPort: {{ default (get $port "port") (get $port "targetPort") }}
-      protocol: {{ default "TCP" (get $port "protocol") }}
-      {{- with (get $port "appProtocol") }}
+    {{- range $i, $port := $ports }}
+    - name: {{ default (printf "port-%d" $i) $port.name }}
+      port: {{ $port.port }}
+      targetPort: {{ default $port.port $port.targetPort }}
+      protocol: {{ default "TCP" $port.protocol }}
+      {{- with $port.appProtocol }}
       appProtocol: {{ . | quote }}
       {{- end }}
       {{- with (get $port "nodePort") }}

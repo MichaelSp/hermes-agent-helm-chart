@@ -51,12 +51,12 @@ secrets:
 
 service:
   enabled: true
-  ports:
-    - name: api-server
-      port: 8642
-      targetPort: 8642
-      containerPort: 8642
 ```
+
+When `service.enabled=true` and `service.ports` is left empty, the chart
+automatically exposes `apiServer`, `webhook`, and `telegramWebhook` listeners
+that are enabled, using their configured port values. Keep `service.ports`
+only for custom/extra service mappings.
 
 ## Webhooks and Telegram webhook mode
 
@@ -74,19 +74,6 @@ telegramWebhook:
 
 service:
   enabled: true
-  ports:
-    - name: api-server
-      port: 8642
-      targetPort: 8642
-      containerPort: 8642
-    - name: webhook
-      port: 8644
-      targetPort: 8644
-      containerPort: 8644
-    - name: telegram-webhook
-      port: 8443
-      targetPort: 8443
-      containerPort: 8443
 ```
 
 When `telegramWebhook.enabled=true`, also set a non-empty `telegramWebhook.url` and provide a Telegram bot token via `secrets.TELEGRAM_BOT_TOKEN` or `secrets.existingSecret`.
@@ -102,6 +89,16 @@ This chart is intentionally open-ended so it can integrate with other Helm chart
 - `extraInitContainers` / `extraContainers` — add sidecars, bootstrap jobs, or service mesh helpers
 - `extraObjects` — inject arbitrary manifests such as `ExternalSecret`, `ServiceMonitor`, or policy resources
 - `serviceAccount.annotations` — attach IRSA / Workload Identity / cloud IAM integration
+- `bootstrap.existingConfigMap` — seed Hermes from a ConfigMap managed by another release/operator
+
+External bootstrap example:
+
+```yaml
+bootstrap:
+  enabled: true
+  overwrite: false
+  existingConfigMap: hermes-shared-bootstrap
+```
 
 ## Operational notes
 
@@ -120,6 +117,8 @@ This repo includes `ci/test-values.yaml` for render checks:
 ```bash
 helm lint .
 helm lint . -f ci/test-values.yaml
+helm lint . -f ci/external-bootstrap-values.yaml
 helm template hermes .
 helm template hermes . -f ci/test-values.yaml
+./ci/verify.sh
 ```

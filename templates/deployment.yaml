@@ -2,7 +2,13 @@
 {{- $mountPath := .Values.persistence.mountPath -}}
 {{- $serviceEnabled := .Values.service.enabled -}}
 {{- $apiServerEnabled := .Values.apiServer.enabled -}}
-{{- $servicePorts := include "hermes-agent.servicePorts" . | fromJson -}}
+{{- $servicePorts := include "hermes-agent.effectiveServicePorts" . | fromYamlArray -}}
+{{- $containerPorts := list -}}
+{{- if $serviceEnabled -}}
+  {{- $containerPorts = $servicePorts -}}
+{{- else -}}
+  {{- $containerPorts = include "hermes-agent.defaultExposedPorts" . | fromYamlArray -}}
+{{- end -}}
 {{- $npmEnabled := gt (len .Values.npmPackages) 0 -}}
 {{- $bootstrapConfigMapName := include "hermes-agent.bootstrapConfigMapName" . -}}
 {{- $bootstrapConfigPath := printf "/bootstrap/%s" .Values.bootstrap.configKey -}}
@@ -57,10 +63,10 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       annotations:
-        {{- if .Values.bootstrap.existingConfigMap }}
-        checksum/config: {{ printf "%s|%s|%s" .Values.bootstrap.existingConfigMap .Values.bootstrap.configKey .Values.bootstrap.soulKey | sha256sum }}
-        {{- else }}
+        {{- if and .Values.bootstrap.enabled (not .Values.bootstrap.existingConfigMap) }}
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- else if .Values.bootstrap.enabled }}
+        checksum/bootstrap-source: {{ printf "%s|%s|%s|%t" (include "hermes-agent.bootstrapConfigMapName" .) .Values.bootstrap.configKey .Values.bootstrap.soulKey .Values.bootstrap.overwrite | sha256sum }}
         {{- end }}
         {{- if not .Values.secrets.existingSecret }}
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
@@ -226,18 +232,12 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
           {{- end }}
-          {{- if or (and $serviceEnabled (gt (len $servicePorts) 0)) $apiServerEnabled }}
+          {{- if gt (len $containerPorts) 0 }}
           ports:
-            {{- if $serviceEnabled }}
-            {{- range $i, $port := $servicePorts }}
-            - name: {{ default (printf "port-%d" $i) (get $port "name") }}
-              containerPort: {{- if hasKey $port "containerPort" }} {{ get $port "containerPort" | int }}{{- else if and (hasKey $port "targetPort") (not (kindIs "string" (get $port "targetPort"))) }} {{ get $port "targetPort" | int }}{{- else }} {{ get $port "port" | int }}{{- end }}
-              protocol: {{ default "TCP" (get $port "protocol") }}
-            {{- end }}
-            {{- else if $apiServerEnabled }}
-            - name: api-server
-              containerPort: {{ .Values.apiServer.port }}
-              protocol: TCP
+            {{- range $i, $port := $containerPorts }}
+            - name: {{ default (printf "port-%d" $i) $port.name }}
+              containerPort: {{- if hasKey $port "containerPort" }} {{ $port.containerPort | int }}{{- else if and (hasKey $port "targetPort") (not (kindIs "string" $port.targetPort)) }} {{ $port.targetPort | int }}{{- else }} {{ $port.port | int }}{{- end }}
+              protocol: {{ default "TCP" $port.protocol }}
             {{- end }}
           {{- end }}
           {{- with .Values.probes.liveness }}
@@ -279,9 +279,11 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        {{- if .Values.bootstrap.enabled }}
         - name: bootstrap
           configMap:
-            name: {{ $bootstrapConfigMapName }}
+            name: {{ include "hermes-agent.bootstrapConfigMapName" . }}
+        {{- end }}
         - name: tmp
           emptyDir: {}
         {{- if .Values.browser.shm.enabled }}

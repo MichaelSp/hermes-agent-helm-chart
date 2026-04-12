@@ -45,7 +45,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{- define "hermes-agent.bootstrapConfigMapName" -}}
-{{- default (include "hermes-agent.configMapName" .) .Values.bootstrap.existingConfigMap -}}
+{{- if .Values.bootstrap.existingConfigMap -}}
+{{- .Values.bootstrap.existingConfigMap -}}
+{{- else -}}
+{{- include "hermes-agent.configMapName" . -}}
+{{- end -}}
 {{- end -}}
 
 {{- define "hermes-agent.secretName" -}}
@@ -60,29 +64,33 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-data" (include "hermes-agent.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
-{{- define "hermes-agent.servicePorts" -}}
+{{- define "hermes-agent.defaultExposedPorts" -}}
 {{- $ports := list -}}
-{{- if gt (len .Values.service.ports) 0 -}}
-  {{- $ports = .Values.service.ports -}}
-{{- else -}}
-  {{- if .Values.apiServer.enabled -}}
-    {{- $ports = append $ports (dict "name" "api-server" "port" (.Values.apiServer.port | int) "targetPort" (.Values.apiServer.port | int) "containerPort" (.Values.apiServer.port | int) "protocol" "TCP") -}}
-  {{- end -}}
-  {{- if .Values.webhook.enabled -}}
-    {{- $ports = append $ports (dict "name" "webhook" "port" (.Values.webhook.port | int) "targetPort" (.Values.webhook.port | int) "containerPort" (.Values.webhook.port | int) "protocol" "TCP") -}}
-  {{- end -}}
-  {{- if .Values.telegramWebhook.enabled -}}
-    {{- $ports = append $ports (dict "name" "telegram-webhook" "port" (.Values.telegramWebhook.port | int) "targetPort" (.Values.telegramWebhook.port | int) "containerPort" (.Values.telegramWebhook.port | int) "protocol" "TCP") -}}
-  {{- end -}}
+{{- if .Values.apiServer.enabled -}}
+{{- $ports = append $ports (dict "name" "api-server" "port" (int .Values.apiServer.port) "targetPort" (int .Values.apiServer.port) "containerPort" (int .Values.apiServer.port) "protocol" "TCP" "appProtocol" "http") -}}
 {{- end -}}
-{{- $ports | toJson -}}
+{{- if .Values.webhook.enabled -}}
+{{- $ports = append $ports (dict "name" "webhook" "port" (int .Values.webhook.port) "targetPort" (int .Values.webhook.port) "containerPort" (int .Values.webhook.port) "protocol" "TCP" "appProtocol" "http") -}}
+{{- end -}}
+{{- if .Values.telegramWebhook.enabled -}}
+{{- $ports = append $ports (dict "name" "telegram-webhook" "port" (int .Values.telegramWebhook.port) "targetPort" (int .Values.telegramWebhook.port) "containerPort" (int .Values.telegramWebhook.port) "protocol" "TCP" "appProtocol" "https") -}}
+{{- end -}}
+{{- toYaml $ports -}}
+{{- end -}}
+
+{{- define "hermes-agent.effectiveServicePorts" -}}
+{{- if gt (len .Values.service.ports) 0 -}}
+{{- toYaml .Values.service.ports -}}
+{{- else -}}
+{{- include "hermes-agent.defaultExposedPorts" . -}}
+{{- end -}}
 {{- end -}}
 
 {{- define "hermes-agent.primaryServicePortNumber" -}}
-{{- $servicePorts := include "hermes-agent.servicePorts" . | fromJson -}}
-{{- if and .Values.service.enabled (gt (len $servicePorts) 0) -}}
-{{- get (index $servicePorts 0) "port" -}}
+{{- $ports := include "hermes-agent.effectiveServicePorts" . | fromYamlArray -}}
+{{- if and .Values.service.enabled (gt (len $ports) 0) -}}
+{{- (index $ports 0).port -}}
 {{- else -}}
-{{- fail "service.enabled=true with either explicit service.ports entries or enabled apiServer/webhook/telegramWebhook ports is required for ingress or virtualService routing" -}}
+{{- fail "service.enabled=true with at least one effective service port is required for ingress or virtualService routing" -}}
 {{- end -}}
 {{- end -}}
