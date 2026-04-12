@@ -19,12 +19,29 @@
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
+{{- define "hermes-agent.tenantLabelKey" -}}
+{{- default "tenant.hermes.ai/id" .Values.tenantIsolation.labelKey -}}
+{{- end -}}
+
+{{- define "hermes-agent.tenantLabels" -}}
+{{- if and .Values.tenantIsolation.enabled .Values.tenantIsolation.tenantId }}
+{{ include "hermes-agent.tenantLabelKey" . }}: {{ .Values.tenantIsolation.tenantId | quote }}
+{{- end }}
+{{- with .Values.tenantIsolation.labels }}
+{{ toYaml . }}
+{{- end }}
+{{- end -}}
+
 {{- define "hermes-agent.labels" -}}
 helm.sh/chart: {{ include "hermes-agent.chart" . }}
 {{ include "hermes-agent.selectorLabels" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 app.kubernetes.io/part-of: hermes-agent
+{{- $tenantLabels := include "hermes-agent.tenantLabels" . }}
+{{- if $tenantLabels }}
+{{ $tenantLabels }}
+{{- end }}
 {{- end -}}
 
 {{- define "hermes-agent.selectorLabels" -}}
@@ -48,11 +65,17 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- default (include "hermes-agent.configMapName" .) .Values.bootstrap.existingConfigMap -}}
 {{- end -}}
 
+{{- define "hermes-agent.generatedSecretName" -}}
+{{- printf "%s-secrets" (include "hermes-agent.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
 {{- define "hermes-agent.secretName" -}}
-{{- if .Values.secrets.existingSecret -}}
+{{- if .Values.externalSecret.enabled -}}
+{{- default (include "hermes-agent.generatedSecretName" .) .Values.externalSecret.target.name -}}
+{{- else if .Values.secrets.existingSecret -}}
 {{- .Values.secrets.existingSecret -}}
 {{- else -}}
-{{- printf "%s-secrets" (include "hermes-agent.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- include "hermes-agent.generatedSecretName" . -}}
 {{- end -}}
 {{- end -}}
 
@@ -79,21 +102,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{- define "hermes-agent.primaryServicePortNumber" -}}
-{{- $servicePorts := .Values.service.ports -}}
-{{- if eq (len $servicePorts) 0 -}}
-  {{- if .Values.apiServer.enabled -}}
-    {{- $servicePorts = append $servicePorts (dict "name" "api-server" "port" (.Values.apiServer.port | int) "targetPort" (.Values.apiServer.port | int) "containerPort" (.Values.apiServer.port | int) "protocol" "TCP") -}}
-  {{- end -}}
-  {{- if .Values.webhook.enabled -}}
-    {{- $servicePorts = append $servicePorts (dict "name" "webhook" "port" (.Values.webhook.port | int) "targetPort" (.Values.webhook.port | int) "containerPort" (.Values.webhook.port | int) "protocol" "TCP") -}}
-  {{- end -}}
-  {{- if .Values.telegramWebhook.enabled -}}
-    {{- $servicePorts = append $servicePorts (dict "name" "telegram-webhook" "port" (.Values.telegramWebhook.port | int) "targetPort" (.Values.telegramWebhook.port | int) "containerPort" (.Values.telegramWebhook.port | int) "protocol" "TCP") -}}
-  {{- end -}}
-{{- end -}}
+{{- $servicePorts := include "hermes-agent.servicePorts" . | fromJson -}}
 {{- if and .Values.service.enabled (gt (len $servicePorts) 0) -}}
 {{- (index $servicePorts 0).port -}}
 {{- else -}}
-{{- fail "service.enabled=true with either explicit service.ports entries or enabled apiServer/webhook/telegramWebhook ports is required for ingress or virtualService routing" -}}
+{{- fail "service.enabled=true with either explicit service.ports entries or enabled apiServer/webhook/telegramWebhook ports is required for ingress, httpRoute, or virtualService routing" -}}
 {{- end -}}
 {{- end -}}
