@@ -89,6 +89,8 @@ service:
       containerPort: 8443
 ```
 
+When `telegramWebhook.enabled=true`, also set a non-empty `telegramWebhook.url` and provide a Telegram bot token via `secrets.TELEGRAM_BOT_TOKEN` or `secrets.existingSecret`.
+
 ## Compose with any Kubernetes chart
 
 This chart is intentionally open-ended so it can integrate with other Helm charts and platform operators without forking:
@@ -109,6 +111,7 @@ This chart is intentionally open-ended so it can integrate with other Helm chart
 - `npmPackages` installs packages into the PVC and exposes them via `PATH`/`NODE_PATH`.
 - Enable `service.enabled` only when you actually want network exposure.
 - Enable `rbac.create` only when Hermes needs in-cluster Kubernetes access.
+- `virtualService.enabled` requires explicit `virtualService.hosts` and `virtualService.gateways`.
 
 ## Verification
 
