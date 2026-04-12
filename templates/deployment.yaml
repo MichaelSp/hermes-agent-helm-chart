@@ -2,7 +2,11 @@
 {{- $mountPath := .Values.persistence.mountPath -}}
 {{- $serviceEnabled := .Values.service.enabled -}}
 {{- $apiServerEnabled := .Values.apiServer.enabled -}}
+{{- $servicePorts := include "hermes-agent.servicePorts" . | fromJson -}}
 {{- $npmEnabled := gt (len .Values.npmPackages) 0 -}}
+{{- $bootstrapConfigMapName := include "hermes-agent.bootstrapConfigMapName" . -}}
+{{- $bootstrapConfigPath := printf "/bootstrap/%s" .Values.bootstrap.configKey -}}
+{{- $bootstrapSoulPath := printf "/bootstrap/%s" .Values.bootstrap.soulKey -}}
 {{- $hasGeneratedSecret := false -}}
 {{- range $key, $value := .Values.secrets }}
   {{- if and (ne $key "existingSecret") (ne $key "annotations") (ne (printf "%v" $value) "") -}}
@@ -53,7 +57,11 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       annotations:
+        {{- if .Values.bootstrap.existingConfigMap }}
+        checksum/config: {{ printf "%s|%s|%s" .Values.bootstrap.existingConfigMap .Values.bootstrap.configKey .Values.bootstrap.soulKey | sha256sum }}
+        {{- else }}
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- end }}
         {{- if not .Values.secrets.existingSecret }}
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
         {{- end }}
@@ -88,18 +96,16 @@ spec:
             - |
               set -eu
               mkdir -p {{ printf "%s/home" $mountPath | quote }}
-              if [ -f /bootstrap/config.yaml ]; then
+              if [ -f {{ $bootstrapConfigPath | quote }} ]; then
                 if [ "{{ $overwrite }}" = "true" ] || [ ! -f {{ printf "%s/config.yaml" $mountPath | quote }} ]; then
-                  cp /bootstrap/config.yaml {{ printf "%s/config.yaml" $mountPath | quote }}
+                  cp {{ $bootstrapConfigPath | quote }} {{ printf "%s/config.yaml" $mountPath | quote }}
                 fi
               fi
-              {{- if .Values.soul.text }}
-              if [ -f /bootstrap/SOUL.md ]; then
+              if [ -f {{ $bootstrapSoulPath | quote }} ]; then
                 if [ "{{ $overwrite }}" = "true" ] || [ ! -f {{ printf "%s/SOUL.md" $mountPath | quote }} ]; then
-                  cp /bootstrap/SOUL.md {{ printf "%s/SOUL.md" $mountPath | quote }}
+                  cp {{ $bootstrapSoulPath | quote }} {{ printf "%s/SOUL.md" $mountPath | quote }}
                 fi
               fi
-              {{- end }}
           env:
             - name: HERMES_HOME
               value: {{ $mountPath | quote }}
@@ -223,7 +229,7 @@ spec:
           {{- if or $serviceEnabled $apiServerEnabled }}
           ports:
             {{- if $serviceEnabled }}
-            {{- range $i, $port := .Values.service.ports }}
+            {{- range $i, $port := $servicePorts }}
             - name: {{ default (printf "port-%d" $i) $port.name }}
               containerPort: {{- if hasKey $port "containerPort" }} {{ $port.containerPort | int }}{{- else if and (hasKey $port "targetPort") (not (kindIs "string" $port.targetPort)) }} {{ $port.targetPort | int }}{{- else }} {{ $port.port | int }}{{- end }}
               protocol: {{ default "TCP" $port.protocol }}
@@ -275,7 +281,7 @@ spec:
           {{- end }}
         - name: bootstrap
           configMap:
-            name: {{ include "hermes-agent.configMapName" . }}
+            name: {{ $bootstrapConfigMapName }}
         - name: tmp
           emptyDir: {}
         {{- if .Values.browser.shm.enabled }}
