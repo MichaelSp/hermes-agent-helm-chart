@@ -157,6 +157,27 @@ secrets:
   BLUEBUBBLES_SERVER_URL: ""
   BLUEBUBBLES_PASSWORD: ""
 
+externalSecret:
+  enabled: false
+  name: ""
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: ""
+  target:
+    name: ""
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: Opaque
+      metadata:
+        annotations: {}
+        labels: {}
+  data: []
+  dataFrom: []
+  annotations: {}
+  labels: {}
+
 apiServer:
   enabled: false
   host: "0.0.0.0"
@@ -209,20 +230,15 @@ service:
   externalTrafficPolicy: ""
   internalTrafficPolicy: ""
   loadBalancerSourceRanges: []
-  # When empty, the chart auto-exposes enabled apiServer/webhook/
-  # telegramWebhook ports. Explicit entries override the defaults.
-  # Example:
-  # When service.enabled=true and this list is empty, the chart automatically
-  # exposes enabled apiServer/webhook/telegramWebhook ports using their
-  # configured port values so common cases do not need duplicated service.ports.
+  # When empty, the chart automatically exposes enabled apiServer/webhook/
+  # telegramWebhook listeners using their configured port values. Explicit
+  # entries override the defaults.
   # ports:
   #   - name: api-server
   #     port: 8642
   #     targetPort: 8642
   #     containerPort: 8642
   #     protocol: TCP
-  # When empty and service.enabled=true, the chart can derive Service ports from
-  # enabled apiServer/webhook/telegramWebhook listeners.
   ports: []
 
 ingress:
@@ -251,6 +267,22 @@ networkPolicy:
     - Egress
   ingress: []
   egress: []
+
+tenantIsolation:
+  enabled: false
+  tenantId: ""
+  labelKey: tenant.hermes.ai/id
+  labels: {}
+  podAntiAffinity:
+    enabled: false
+    type: preferredDuringSchedulingIgnoredDuringExecution
+    topologyKey: kubernetes.io/hostname
+  networkPolicy:
+    enabled: false
+    allowSameNamespace: true
+    allowedNamespaceSelector: {}
+    additionalIngress: []
+    additionalEgress: []
 
 pdb:
   enabled: false
