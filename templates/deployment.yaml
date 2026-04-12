@@ -15,6 +15,12 @@
 {{- if and $apiServerEnabled (not .Values.secrets.existingSecret) (eq (printf "%v" .Values.secrets.API_SERVER_KEY) "") }}
 {{- fail "apiServer.enabled requires secrets.API_SERVER_KEY when secrets.existingSecret is not set" }}
 {{- end }}
+{{- if and .Values.telegramWebhook.enabled (eq (trim .Values.telegramWebhook.url) "") }}
+{{- fail "telegramWebhook.enabled requires telegramWebhook.url" }}
+{{- end }}
+{{- if and .Values.telegramWebhook.enabled (not .Values.secrets.existingSecret) (eq (printf "%v" .Values.secrets.TELEGRAM_BOT_TOKEN) "") }}
+{{- fail "telegramWebhook.enabled requires secrets.TELEGRAM_BOT_TOKEN when secrets.existingSecret is not set" }}
+{{- end }}
 {{- $npmHash := "" -}}
 {{- if $npmEnabled -}}
 {{- $npmHash = sha256sum (join "," .Values.npmPackages) -}}
