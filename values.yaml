@@ -177,6 +177,10 @@ externalSecret:
   annotations: {}
   labels: {}
 
+tenant:
+  id: ""
+  labels: {}
+
 apiServer:
   enabled: false
   host: "0.0.0.0"
@@ -269,20 +273,14 @@ networkPolicy:
 
 tenantIsolation:
   enabled: false
-  tenantId: ""
-  labelKey: tenant.hermes.ai/id
-  labels: {}
+  allowSameNamespace: true
+  authorizedNamespaces: []
+  allowDns: true
+  additionalEgress: []
   podAntiAffinity:
     enabled: false
     type: preferredDuringSchedulingIgnoredDuringExecution
     topologyKey: kubernetes.io/hostname
-  networkPolicy:
-    enabled: false
-    allowSameNamespace: true
-    authorizedNamespaces: []
-    allowDns: true
-    additionalIngress: []
-    additionalEgress: []
 
 pdb:
   enabled: false

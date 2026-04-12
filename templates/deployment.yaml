@@ -2,40 +2,38 @@
 {{- $mountPath := .Values.persistence.mountPath -}}
 {{- $serviceEnabled := .Values.service.enabled -}}
 {{- $apiServerEnabled := .Values.apiServer.enabled -}}
-{{- $servicePorts := .Values.service.ports -}}
-{{- if eq (len $servicePorts) 0 -}}
-  {{- if .Values.apiServer.enabled -}}
-    {{- $servicePorts = append $servicePorts (dict "name" "api-server" "port" (.Values.apiServer.port | int) "targetPort" (.Values.apiServer.port | int) "containerPort" (.Values.apiServer.port | int) "protocol" "TCP") -}}
-  {{- end -}}
-  {{- if .Values.webhook.enabled -}}
-    {{- $servicePorts = append $servicePorts (dict "name" "webhook" "port" (.Values.webhook.port | int) "targetPort" (.Values.webhook.port | int) "containerPort" (.Values.webhook.port | int) "protocol" "TCP") -}}
-  {{- end -}}
-  {{- if .Values.telegramWebhook.enabled -}}
-    {{- $servicePorts = append $servicePorts (dict "name" "telegram-webhook" "port" (.Values.telegramWebhook.port | int) "targetPort" (.Values.telegramWebhook.port | int) "containerPort" (.Values.telegramWebhook.port | int) "protocol" "TCP") -}}
-  {{- end -}}
-{{- end -}}
+{{- $servicePorts := include "hermes-agent.servicePorts" . | fromJsonArray -}}
 {{- $npmEnabled := gt (len .Values.npmPackages) 0 -}}
 {{- $bootstrapConfigMapName := include "hermes-agent.bootstrapConfigMapName" . -}}
 {{- $bootstrapConfigPath := printf "/bootstrap/%s" .Values.bootstrap.configKey -}}
 {{- $bootstrapSoulPath := printf "/bootstrap/%s" .Values.bootstrap.soulKey -}}
-{{- $affinity := deepCopy (.Values.affinity | default dict) -}}
-{{- $hasGeneratedSecret := false -}}
+{{- $hasInlineSecretValues := false -}}
 {{- range $key, $value := .Values.secrets }}
   {{- if and (ne $key "existingSecret") (ne $key "annotations") (ne (printf "%v" $value) "") -}}
-    {{- $hasGeneratedSecret = true -}}
+    {{- $hasInlineSecretValues = true -}}
   {{- end -}}
 {{- end -}}
+{{- $secretManagedExternally := or .Values.externalSecret.enabled .Values.secrets.existingSecret -}}
 {{- if and (gt $replicas 1) .Values.persistence.enabled }}
 {{- fail "Hermes Agent supports only one replica when persistence.enabled=true because HERMES_HOME contains mutable shared state" }}
 {{- end }}
-{{- if and $apiServerEnabled (not .Values.secrets.existingSecret) (eq (printf "%v" .Values.secrets.API_SERVER_KEY) "") }}
-{{- fail "apiServer.enabled requires secrets.API_SERVER_KEY when secrets.existingSecret is not set" }}
+{{- if and .Values.tenantIsolation.enabled (eq (trim .Values.tenant.id) "") }}
+{{- fail "tenantIsolation.enabled requires tenant.id" }}
+{{- end }}
+{{- if and .Values.externalSecret.enabled .Values.secrets.existingSecret }}
+{{- fail "externalSecret.enabled cannot be combined with secrets.existingSecret" }}
+{{- end }}
+{{- if and .Values.externalSecret.enabled $hasInlineSecretValues }}
+{{- fail "externalSecret.enabled cannot be combined with inline secrets.* values" }}
+{{- end }}
+{{- if and $apiServerEnabled (not $secretManagedExternally) (eq (printf "%v" .Values.secrets.API_SERVER_KEY) "") }}
+{{- fail "apiServer.enabled requires secrets.API_SERVER_KEY when neither secrets.existingSecret nor externalSecret.enabled is set" }}
 {{- end }}
 {{- if and .Values.telegramWebhook.enabled (eq (trim .Values.telegramWebhook.url) "") }}
 {{- fail "telegramWebhook.enabled requires telegramWebhook.url" }}
 {{- end }}
-{{- if and .Values.telegramWebhook.enabled (not .Values.secrets.existingSecret) (eq (printf "%v" .Values.secrets.TELEGRAM_BOT_TOKEN) "") }}
-{{- fail "telegramWebhook.enabled requires secrets.TELEGRAM_BOT_TOKEN when secrets.existingSecret is not set" }}
+{{- if and .Values.telegramWebhook.enabled (not $secretManagedExternally) (eq (printf "%v" .Values.secrets.TELEGRAM_BOT_TOKEN) "") }}
+{{- fail "telegramWebhook.enabled requires secrets.TELEGRAM_BOT_TOKEN when neither secrets.existingSecret nor externalSecret.enabled is set" }}
 {{- end }}
 {{- if and .Values.tenantIsolation.enabled (not .Values.tenantIsolation.tenantId) }}
 {{- fail "tenantIsolation.enabled=true requires tenantIsolation.tenantId" }}
@@ -85,7 +83,9 @@ spec:
         {{- else }}
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         {{- end }}
-        {{- if not .Values.secrets.existingSecret }}
+        {{- if .Values.externalSecret.enabled }}
+        checksum/external-secret: {{ include (print $.Template.BasePath "/external-secret.yaml") . | sha256sum }}
+        {{- else if not .Values.secrets.existingSecret }}
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
         {{- end }}
         {{- with .Values.podAnnotations }}
@@ -235,11 +235,11 @@ spec:
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          {{- if or .Values.secrets.existingSecret .Values.extraEnvFrom $hasGeneratedSecret }}
+          {{- if or .Values.externalSecret.enabled .Values.secrets.existingSecret .Values.extraEnvFrom $hasInlineSecretValues }}
           envFrom:
-            {{- if .Values.secrets.existingSecret }}
+            {{- if or .Values.externalSecret.enabled .Values.secrets.existingSecret }}
             - secretRef:
-                name: {{ .Values.secrets.existingSecret }}
+                name: {{ include "hermes-agent.secretName" . }}
             {{- else }}
             - secretRef:
                 name: {{ include "hermes-agent.secretName" . }}
@@ -321,9 +321,20 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with $affinity }}
+      {{- $affinity := deepCopy .Values.affinity }}
+      {{- if and .Values.tenantIsolation.enabled .Values.tenantIsolation.podAntiAffinity.enabled .Values.tenant.id }}
+        {{- $tenantTerm := dict "labelSelector" (dict "matchExpressions" (list (dict "key" (include "hermes-agent.tenantLabelKey" .) "operator" "In" "values" (list .Values.tenant.id)))) "topologyKey" .Values.tenantIsolation.podAntiAffinity.topologyKey }}
+        {{- $tenantAffinity := dict }}
+        {{- if eq .Values.tenantIsolation.podAntiAffinity.type "requiredDuringSchedulingIgnoredDuringExecution" }}
+          {{- $tenantAffinity = dict "podAntiAffinity" (dict "requiredDuringSchedulingIgnoredDuringExecution" (list $tenantTerm)) }}
+        {{- else }}
+          {{- $tenantAffinity = dict "podAntiAffinity" (dict "preferredDuringSchedulingIgnoredDuringExecution" (list (dict "weight" 100 "podAffinityTerm" $tenantTerm))) }}
+        {{- end }}
+        {{- $affinity = mergeOverwrite $affinity $tenantAffinity }}
+      {{- end }}
+      {{- if $affinity }}
       affinity:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml $affinity | nindent 8 }}
       {{- end }}
       {{- with .Values.tolerations }}
       tolerations:
