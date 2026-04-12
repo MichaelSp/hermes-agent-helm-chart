@@ -290,7 +290,6 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
-        {{- if .Values.bootstrap.enabled }}
         - name: bootstrap
           configMap:
             name: {{ $bootstrapConfigMapName }}
