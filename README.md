@@ -122,6 +122,27 @@ contain `config.yaml` and may optionally include `SOUL.md`. Because the content
 is managed outside this chart, operators should also plan how rollout/restart
 should happen when that external ConfigMap changes.
 
+Example: use bootstrap content managed by another chart or operator:
+
+```yaml
+bootstrap:
+  existingConfigMap: hermes-shared-bootstrap
+
+secrets:
+  existingSecret: hermes-shared-secrets
+
+apiServer:
+  enabled: true
+
+service:
+  enabled: true
+```
+
+When `bootstrap.existingConfigMap` is used, the referenced ConfigMap should
+contain `config.yaml` and may optionally include `SOUL.md`. Because the content
+is managed outside this chart, operators should also plan how rollout/restart
+should happen when that external ConfigMap changes.
+
 ## Operational notes
 
 - Keep `replicaCount: 1` when persistence is enabled.
