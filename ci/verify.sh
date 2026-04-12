@@ -66,15 +66,15 @@ expect_fail \
 
 expect_fail \
   "service exposure requires ports or enabled endpoints" \
-  "Must validate one and only one schema (oneOf)" \
+  "service.ports: Array must have at least 1 items" \
   helm lint . -f ci/negative-service-values.yaml
 
 expect_fail \
   "persistent replicas limited to one" \
-  "replicaCount: replicaCount must be one of the following: 1" \
+  "replicaCount: replicaCount does not match: 1" \
   helm lint . -f ci/negative-persistent-replicas-values.yaml
 
 expect_fail \
   "virtual service gateways required" \
-  "virtualService.enabled=true requires at least one entry in virtualService.gateways" \
+  "virtualService.gateways: Array must have at least 1 items" \
   helm lint . --set service.enabled=true --set apiServer.enabled=true --set virtualService.enabled=true
