@@ -1,0 +1,18 @@
+suite: configmap (bootstrap)
+templates:
+  - configmap.yaml
+
+tests:
+  - it: renders a chart-managed ConfigMap by default
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ConfigMap
+
+  - it: does not render a chart-managed ConfigMap when existingConfigMap is set
+    values:
+      - external-bootstrap-values.yaml
+    asserts:
+      - hasDocuments:
+          count: 0

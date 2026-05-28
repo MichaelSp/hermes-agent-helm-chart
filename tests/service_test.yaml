@@ -1,0 +1,78 @@
+suite: service
+templates:
+  - service.yaml
+
+tests:
+  - it: does not render a Service when disabled
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a ClusterIP Service when enabled
+    set:
+      service.enabled: true
+      apiServer.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Service
+      - equal:
+          path: spec.type
+          value: ClusterIP
+
+  - it: auto-derives api-server port when apiServer is enabled
+    values:
+      - default-service-ports-values.yaml
+    asserts:
+      - contains:
+          path: spec.ports
+          content:
+            name: api-server
+            port: 8642
+            targetPort: 8642
+            protocol: TCP
+
+  - it: auto-derives webhook port when webhook is enabled
+    values:
+      - default-service-ports-values.yaml
+    asserts:
+      - contains:
+          path: spec.ports
+          content:
+            name: webhook
+            port: 8644
+            targetPort: 8644
+            protocol: TCP
+
+  - it: auto-derives telegram-webhook port when telegramWebhook is enabled
+    values:
+      - default-service-ports-values.yaml
+    asserts:
+      - contains:
+          path: spec.ports
+          content:
+            name: telegram-webhook
+            port: 8443
+            targetPort: 8443
+            protocol: TCP
+
+  - it: uses explicit ports when provided
+    values:
+      - test-values.yaml
+    asserts:
+      - contains:
+          path: spec.ports
+          content:
+            name: api-server
+            port: 8642
+            targetPort: 8642
+            protocol: TCP
+
+  - it: preserves Service annotations in tenant-isolation fixture
+    values:
+      - tenant-isolation-values.yaml
+    asserts:
+      - equal:
+          path: metadata.annotations["external-dns.alpha.kubernetes.io/hostname"]
+          value: hermes.tenant-a.example.test

@@ -1,0 +1,34 @@
+suite: virtualservice
+templates:
+  - virtualservice.yaml
+
+tests:
+  - it: does not render a VirtualService by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a VirtualService when enabled
+    values:
+      - test-values.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: VirtualService
+
+  - it: sets gateways from test-values
+    values:
+      - test-values.yaml
+    asserts:
+      - contains:
+          path: spec.gateways
+          content: mesh
+
+  - it: sets tenant gateway in tenant-isolation fixture
+    values:
+      - tenant-isolation-values.yaml
+    asserts:
+      - contains:
+          path: spec.gateways
+          content: istio-system/tenant-gateway

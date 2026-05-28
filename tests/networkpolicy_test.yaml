@@ -1,0 +1,43 @@
+suite: networkpolicy
+templates:
+  - networkpolicy.yaml
+
+tests:
+  - it: does not render a NetworkPolicy by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a NetworkPolicy when enabled
+    values:
+      - test-values.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: NetworkPolicy
+
+  - it: renders the tenant isolation NetworkPolicy
+    values:
+      - tenant-isolation-values.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: hermes-multi-tenant
+
+  - it: tenant isolation NetworkPolicy ingress rule includes authorized namespaces via matchExpressions
+    values:
+      - tenant-isolation-values.yaml
+    asserts:
+      - contains:
+          path: spec.ingress[0].from
+          content:
+            namespaceSelector:
+              matchExpressions:
+                - key: kubernetes.io/metadata.name
+                  operator: In
+                  values:
+                    - ingress-nginx
+                    - istio-system

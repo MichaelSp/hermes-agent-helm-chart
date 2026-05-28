@@ -1,0 +1,126 @@
+suite: deployment
+templates:
+  - deployment.yaml
+  - configmap.yaml
+  - secret.yaml
+
+tests:
+  - it: renders a Deployment by default
+    asserts:
+      - isKind:
+          of: Deployment
+        template: deployment.yaml
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: nousresearch/hermes-agent:0.8.0
+        template: deployment.yaml
+
+  - it: uses Recreate strategy by default
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+        template: deployment.yaml
+
+  - it: mounts /run as emptyDir
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: run
+            emptyDir: {}
+        template: deployment.yaml
+
+  - it: sets readOnlyRootFilesystem by default
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+        template: deployment.yaml
+
+  - it: applies custom fullnameOverride
+    set:
+      fullnameOverride: my-hermes
+    asserts:
+      - equal:
+          path: metadata.name
+          value: my-hermes
+        template: deployment.yaml
+
+  - it: exposes apiServer container port when enabled
+    set:
+      apiServer.enabled: true
+      secrets.API_SERVER_KEY: test-key
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: api-server
+            containerPort: 8642
+            protocol: TCP
+        template: deployment.yaml
+
+  - it: exposes webhook container port when enabled with service
+    set:
+      webhook.enabled: true
+      service.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: webhook
+            containerPort: 8644
+            protocol: TCP
+        template: deployment.yaml
+
+  - it: exposes telegram-webhook container port when enabled with service
+    set:
+      telegramWebhook.enabled: true
+      telegramWebhook.url: https://hermes.example.test/telegram
+      secrets.TELEGRAM_BOT_TOKEN: bot-token
+      service.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: telegram-webhook
+            containerPort: 8443
+            protocol: TCP
+        template: deployment.yaml
+
+  - it: does not render a Deployment in operator mode
+    set:
+      operator.enabled: true
+      operator.controllerClass: hermes.ai/default
+    templates:
+      - deployment.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders full test-values fixture without errors
+    values:
+      - test-values.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+        template: deployment.yaml
+
+  - it: renders existing-claim fixture without errors
+    values:
+      - existing-claim-values.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+        template: deployment.yaml
+
+  - it: renders with custom npm packages
+    values:
+      - test-values.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers
+          any: true
+          content:
+            name: npm-install
+        template: deployment.yaml
