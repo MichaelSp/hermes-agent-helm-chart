@@ -31,11 +31,11 @@ tests:
             emptyDir: {}
         template: deployment.yaml
 
-  - it: sets readOnlyRootFilesystem by default
+  - it: sets readOnlyRootFilesystem to false by default (s6-overlay requires /run writes)
     asserts:
       - equal:
           path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
-          value: true
+          value: false
         template: deployment.yaml
 
   - it: applies custom fullnameOverride
