@@ -7,7 +7,7 @@ on:
 
 jobs:
   lint-and-test:
-    name: Helm Lint & Verify
+    name: Helm Lint & Unit Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -17,5 +17,11 @@ jobs:
         with:
           version: "3.17.0"
 
-      - name: Run verify script (lint + render checks)
-        run: bash ci/verify.sh
+      - name: Install helm-unittest plugin
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --verify=false
+
+      - name: Lint chart
+        run: helm lint .
+
+      - name: Run unit tests
+        run: helm unittest .

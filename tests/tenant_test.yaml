@@ -1,0 +1,15 @@
+suite: tenant isolation labels
+templates:
+  - deployment.yaml
+  - configmap.yaml
+  - secret.yaml
+
+tests:
+  - it: applies tenant label to pod template
+    values:
+      - tenant-isolation-values.yaml
+    asserts:
+      - equal:
+          path: spec.template.metadata.labels["tenant.hermes.ai/id"]
+          value: tenant-a
+        template: deployment.yaml

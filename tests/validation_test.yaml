@@ -1,0 +1,59 @@
+suite: validation (schema failures)
+
+tests:
+  - it: fails when telegramWebhook is enabled without a URL
+    set:
+      telegramWebhook.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessageContains: "minLength"
+
+  - it: fails when service is enabled without ports or enabled endpoints
+    values:
+      - negative-service-values.yaml
+    asserts:
+      - failedTemplate:
+          errorMessageContains: "minItems"
+
+  - it: fails when replicaCount > 1 with persistence enabled
+    values:
+      - negative-persistent-replicas-values.yaml
+    asserts:
+      - failedTemplate:
+          errorMessageContains: "value must be 1"
+
+  - it: fails when virtualService is enabled without gateways
+    set:
+      service.enabled: true
+      apiServer.enabled: true
+      virtualService.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessageContains: "minItems"
+
+  - it: fails when externalSecret is enabled without secretStoreRef.name
+    values:
+      - external-secret-values.yaml
+    set:
+      externalSecret.secretStoreRef.name: ""
+    asserts:
+      - failedTemplate:
+          errorMessageContains: "secretStoreRef/name"
+
+  - it: fails when tenantIsolation is enabled without tenant.id
+    values:
+      - tenant-isolation-values.yaml
+    set:
+      tenant.id: ""
+    asserts:
+      - failedTemplate:
+          errorMessageContains: "tenant/id"
+
+  - it: fails when operator mode is enabled without controllerClass
+    values:
+      - operator-values.yaml
+    set:
+      operator.controllerClass: ""
+    asserts:
+      - failedTemplate:
+          errorMessageContains: "controllerClass"

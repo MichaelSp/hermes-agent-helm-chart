@@ -1,0 +1,21 @@
+suite: deployment (bootstrap mount)
+templates:
+  - deployment.yaml
+  - configmap.yaml
+  - secret.yaml
+
+tests:
+  - it: mounts external ConfigMap bootstrap when existingConfigMap is set
+    values:
+      - external-bootstrap-values.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+        template: deployment.yaml
+      - contains:
+          path: spec.template.spec.volumes
+          any: true
+          content:
+            configMap:
+              name: hermes-shared-bootstrap
+        template: deployment.yaml

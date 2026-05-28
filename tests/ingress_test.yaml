@@ -1,0 +1,42 @@
+suite: ingress
+templates:
+  - ingress.yaml
+
+tests:
+  - it: does not render an Ingress by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders an Ingress when enabled
+    values:
+      - test-values.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Ingress
+
+  - it: sets ingressClassName from test-values
+    values:
+      - test-values.yaml
+    asserts:
+      - equal:
+          path: spec.ingressClassName
+          value: nginx
+
+  - it: sets ingress host from test-values
+    values:
+      - test-values.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].host
+          value: hermes.example.test
+
+  - it: preserves nginx timeout annotation in tenant-isolation fixture
+    values:
+      - tenant-isolation-values.yaml
+    asserts:
+      - equal:
+          path: metadata.annotations["nginx.ingress.kubernetes.io/proxy-read-timeout"]
+          value: "3600"
