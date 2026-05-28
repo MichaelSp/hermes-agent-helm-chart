@@ -48,3 +48,14 @@ jobs:
           CHART_FILE=$(ls *.tgz | head -1)
           OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           helm push "$CHART_FILE" "oci://ghcr.io/${OWNER}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CHART_VERSION=$(grep '^version:' Chart.yaml | awk '{print $2}')
+          CHART_FILE=$(ls *.tgz | head -1)
+          gh release create "v${CHART_VERSION}" \
+            --title "v${CHART_VERSION}" \
+            --generate-notes \
+            "$CHART_FILE"
