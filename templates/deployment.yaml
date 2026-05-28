@@ -131,6 +131,8 @@ spec:
               readOnly: true
             - name: tmp
               mountPath: /tmp
+            - name: run
+              mountPath: /run
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
         {{- end }}
@@ -164,6 +166,8 @@ spec:
               mountPath: {{ $mountPath }}
             - name: tmp
               mountPath: /tmp
+            - name: run
+              mountPath: /run
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
         {{- end }}
@@ -275,6 +279,8 @@ spec:
               mountPath: {{ $mountPath }}
             - name: tmp
               mountPath: /tmp
+            - name: run
+              mountPath: /run
             {{- if .Values.browser.shm.enabled }}
             - name: dshm
               mountPath: {{ .Values.browser.shm.mountPath }}
@@ -297,6 +303,8 @@ spec:
           configMap:
             name: {{ $bootstrapConfigMapName }}
         - name: tmp
+          emptyDir: {}
+        - name: run
           emptyDir: {}
         {{- if .Values.browser.shm.enabled }}
         - name: dshm
