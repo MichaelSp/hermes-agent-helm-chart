@@ -25,7 +25,7 @@ This chart packages Hermes Agent for Kubernetes with cloud-native defaults, expl
 ## Quick start
 
 ```bash
-helm install hermes . \
+helm install hermes oci://ghcr.io/michaelsp/hermes-agent \
   --namespace hermes \
   --create-namespace
 ```
