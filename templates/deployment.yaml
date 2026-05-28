@@ -187,6 +187,8 @@ spec:
             {{- toYaml .Values.args | nindent 12 }}
           workingDir: {{ .Values.workingDir }}
           env:
+            - name: S6_YES_I_WANT_A_WORLD_WRITABLE_RUN_BECAUSE_KUBERNETES
+              value: "1"
             - name: HERMES_HOME
               value: {{ $mountPath | quote }}
             - name: HOME
