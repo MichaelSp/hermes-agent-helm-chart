@@ -1,0 +1,21 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  lint-and-test:
+    name: Helm Lint & Verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: "3.17.0"
+
+      - name: Run verify script (lint + render checks)
+        run: bash ci/verify.sh

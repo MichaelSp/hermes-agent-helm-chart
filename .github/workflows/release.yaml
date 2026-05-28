@@ -1,0 +1,36 @@
+name: Release Chart
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    name: Package & Publish OCI Chart
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: "3.17.0"
+
+      - name: Log in to GitHub Container Registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io \
+            --username "${{ github.actor }}" \
+            --password-stdin
+
+      - name: Package chart
+        run: helm package .
+
+      - name: Push chart to GHCR
+        run: |
+          CHART_FILE=$(ls *.tgz | head -1)
+          helm push "$CHART_FILE" oci://ghcr.io/${{ github.repository_owner }}
