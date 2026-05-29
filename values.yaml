@@ -94,13 +94,15 @@ env:
   SIGNAL_GROUP_ALLOWED_USERS: ""
 
 extraEnv:
-  # S6_KEEP_ENV: prevents with-contenv from calling s6-applyuidgid (which
-  # requires CAP_SETGID) when the container starts as non-root (runAsUser: 10000).
+  # S6_KEEP_ENV: prevents environment reset between s6 stages; the entire
+  # supervision tree inherits the original env vars without needing
+  # with-contenv to call s6-applyuidgid (which requires CAP_SETGID and
+  # fails when the container runs as non-root with all capabilities dropped).
   - name: S6_KEEP_ENV
     value: "1"
-  # S6_READ_ONLY_ROOT: tells s6-overlay to copy /etc to /run/s6/etc before
-  # applying permission changes, required when readOnlyRootFilesystem is false
-  # but the overlay /etc path is read-only.
+  # S6_READ_ONLY_ROOT: instructs s6-overlay stage2 to copy /etc to
+  # /run/s6/etc before applying permission changes. Required when the
+  # overlay /etc path cannot be written directly (e.g. read-only layer).
   - name: S6_READ_ONLY_ROOT
     value: "1"
 extraEnvFrom: []
