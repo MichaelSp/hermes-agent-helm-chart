@@ -73,7 +73,6 @@ jobs:
             printf '%s\n' "${TAGS}"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
