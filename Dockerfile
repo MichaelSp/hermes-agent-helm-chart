@@ -53,17 +53,16 @@ RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && 
 WORKDIR /opt/hermes
 
 COPY package.json package-lock.json ./
-COPY web/package.json web/package-lock.json web/
-COPY ui-tui/package.json ui-tui/package-lock.json ui-tui/
-COPY ui-tui/packages/hermes-ink/package.json ui-tui/packages/hermes-ink/package-lock.json ui-tui/packages/hermes-ink/
+# Copy workspace manifests first for better layer caching.
+COPY web/package.json web/
+COPY ui-tui/package.json ui-tui/
+# hermes-ink is a file: workspace dependency, so npm needs the full tree.
+COPY ui-tui/packages/hermes-ink/ ui-tui/packages/hermes-ink/
 
 ENV npm_config_install_links=false
 
 RUN npm install --prefer-offline --no-audit && \
-    cd web && npm install --prefer-offline --no-audit && \
-    cd ../ui-tui/packages/hermes-ink && npm install --prefer-offline --no-audit && \
-    cd ../../ && npm install --prefer-offline --no-audit && \
-    cd /opt/hermes && npx playwright install --with-deps chromium --only-shell && \
+    npx playwright install --with-deps chromium --only-shell && \
     npm cache clean --force
 
 COPY pyproject.toml uv.lock ./
