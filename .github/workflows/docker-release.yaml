@@ -94,11 +94,14 @@ jobs:
             HERMES_GIT_SHA=${{ steps.source.outputs.sha }}
           push: ${{ github.event_name == 'push' && steps.tag.outputs.new_tag != '' }}
           tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha,scope=hermes-docker-release
+          cache-to: type=gha,scope=hermes-docker-release,mode=max
 
       - name: Create GitHub Release
         if: ${{ github.event_name == 'push' && steps.tag.outputs.new_tag != '' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: ./chart-repo
         run: |
           TAG="${{ steps.tag.outputs.new_tag }}"
           gh release create "${TAG}" \
