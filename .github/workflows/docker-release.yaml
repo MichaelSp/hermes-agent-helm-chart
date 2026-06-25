@@ -14,12 +14,26 @@ jobs:
       packages: write
 
     steps:
-      - name: Checkout
+      - name: Checkout chart repo
         uses: actions/checkout@v7
+        with:
+          path: chart-repo
+
+      - name: Checkout Hermes source
+        uses: actions/checkout@v7
+        with:
+          repository: NousResearch/hermes-agent
+          path: hermes-source
 
       - name: Compute image name
         id: image
         run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare build context
+        id: source
+        run: |
+          cp chart-repo/Dockerfile hermes-source/Dockerfile
+          echo "sha=$(git -C hermes-source rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -44,8 +58,10 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v7
         with:
-          context: .
-          file: ./Dockerfile
+          context: ./hermes-source
+          file: ./hermes-source/Dockerfile
+          build-args: |
+            HERMES_GIT_SHA=${{ steps.source.outputs.sha }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

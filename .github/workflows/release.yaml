@@ -48,8 +48,7 @@ jobs:
           VERSION="${{ steps.tag.outputs.new_version }}"
           CHART_FILE="hermes-agent-${VERSION}.tgz"
           helm package . \
-            --version "${VERSION}" \
-            --app-version "${VERSION}"
+            --version "${VERSION}"
           echo "chart_file=${CHART_FILE}" >> "$GITHUB_OUTPUT"
 
       - name: Push chart to GHCR
