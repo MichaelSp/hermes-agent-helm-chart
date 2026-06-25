@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release:
     name: Package & Publish OCI Chart
@@ -38,24 +42,31 @@ jobs:
             --password-stdin
 
       - name: Package chart
+        id: package
+        if: ${{ steps.tag.outputs.new_tag != '' }}
         run: |
           VERSION="${{ steps.tag.outputs.new_version }}"
-          yq e ".version = \"${VERSION}\"" -i Chart.yaml
-          helm package .
+          CHART_FILE="hermes-agent-${VERSION}.tgz"
+          helm package . \
+            --version "${VERSION}" \
+            --app-version "${VERSION}"
+          echo "chart_file=${CHART_FILE}" >> "$GITHUB_OUTPUT"
 
       - name: Push chart to GHCR
+        if: ${{ steps.tag.outputs.new_tag != '' }}
         run: |
-          CHART_FILE=$(ls *.tgz | head -1)
-          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          CHART_FILE="${{ steps.package.outputs.chart_file }}"
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
           helm push "$CHART_FILE" "oci://ghcr.io/${OWNER}"
 
       - name: Create GitHub Release
+        if: ${{ steps.tag.outputs.new_tag != '' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          CHART_VERSION=$(grep '^version:' Chart.yaml | awk '{print $2}')
-          CHART_FILE=$(ls *.tgz | head -1)
-          gh release create "v${CHART_VERSION}" \
-            --title "v${CHART_VERSION}" \
+          TAG="${{ steps.tag.outputs.new_tag }}"
+          CHART_FILE="${{ steps.package.outputs.chart_file }}"
+          gh release create "${TAG}" \
+            --title "${TAG}" \
             --generate-notes \
             "$CHART_FILE"
