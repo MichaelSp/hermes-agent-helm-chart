@@ -4,9 +4,12 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - Dockerfile
+      - .github/workflows/docker-release.yaml
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: chart-release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
