@@ -12,7 +12,7 @@ tests:
         template: deployment.yaml
       - equal:
           path: spec.template.spec.containers[0].image
-          value: ghcr.io/michaelsp/hermes-agent/docker:0.0.2
+          value: ghcr.io/michaelsp/hermes-agent/docker:v2026.6.19
         template: deployment.yaml
 
   - it: uses Recreate strategy by default
