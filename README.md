@@ -47,7 +47,7 @@ config:
 This screenshot was captured from a local `kind` cluster (`kind-hermes-test`) after installing a demo release named `hermes-demo` into the `hermes-demo` namespace.
 
 > [!TIP]
-> For this live local capture I used `image.tag=latest`, because the chart's default `0.8.0` image tag was not available from Docker Hub in this environment.
+> The chart defaults `image.tag` to `Chart.appVersion`, which is currently the upstream repository ref `v2026.6.19`.
 
 ![kubectl snapshot from a local Hermes Agent deployment on kind](docs/images/kubectl-kind-hermes-demo.png)
 
