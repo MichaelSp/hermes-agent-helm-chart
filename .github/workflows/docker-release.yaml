@@ -36,6 +36,8 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: NousResearch/hermes-agent
+          # renovate: datasource=github-tags depName=NousResearch/hermes-agent versioning=loose
+          ref: v2026.6.19
           path: hermes-source
 
       - name: Compute image name

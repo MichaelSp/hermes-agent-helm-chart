@@ -1,4 +1,14 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["github>MichaelSp/MichaelSp//.github/renovate.json5"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update Hermes source ref in docker-release workflow",
+      "fileMatch": ["^\\.github/workflows/docker-release\\.yaml$"],
+      "matchStrings": [
+        "repository:\\s*NousResearch/hermes-agent\\s+# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) versioning=(?<versioning>\\S+)\\s+ref:\\s*(?<currentValue>\\S+)"
+      ]
+    }
+  ],
 }
