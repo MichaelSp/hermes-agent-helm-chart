@@ -21,7 +21,7 @@ jobs:
       packages: write
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.0
         with:
           fetch-depth: 0
 
@@ -34,7 +34,7 @@ jobs:
           tag_prefix: v
 
       - name: Install Helm
-        uses: azure/setup-helm@v5
+        uses: azure/setup-helm@v5.0.1
         with:
           version: "4.2.2"
 
