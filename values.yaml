@@ -2,8 +2,8 @@ nameOverride: ""
 fullnameOverride: ""
 
 image:
-  repository: nousresearch/hermes-agent
-  tag: "0.8.0"
+  repository: ghcr.io/michaelsp/hermes-agent/docker
+  tag: "0.0.2"
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
