@@ -21,7 +21,9 @@
     {
       "customType": "regex",
       "description": "Update helm-unittest plugin version in PR workflow",
-      "fileMatch": ["^\\.github/workflows/pr\\.yaml$"],
+      "managerFilePatterns": [
+        "/^\\.github/workflows/pr\\.yaml$/"
+      ],
       "matchStrings": [
         "helm plugin install https://github\\.com/helm-unittest/helm-unittest --version (?<currentValue>\\S+) --verify=false"
       ],
