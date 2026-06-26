@@ -5,7 +5,9 @@
     {
       "customType": "regex",
       "description": "Update Hermes source ref in docker-release workflow",
-      "fileMatch": ["^\\.github/workflows/docker-release\\.yaml$"],
+      "managerFilePatterns": [
+        "/^\\.github/workflows/docker-release\\.yaml$/"
+      ],
       "matchStrings": [
         "repository:\\s*NousResearch/hermes-agent\\s+# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) versioning=(?<versioning>\\S+)\\s+ref:\\s*(?<currentValue>\\S+)"
       ]
