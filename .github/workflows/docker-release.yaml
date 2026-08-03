@@ -20,7 +20,7 @@ concurrency:
 
 env:
   # renovate: datasource=github-tags depName=NousResearch/hermes-agent versioning=loose
-  HERMES_SOURCE_REF: v2026.6.19
+  HERMES_SOURCE_REF: v2026.8.3
 
 jobs:
   publish:
