@@ -32,12 +32,12 @@ jobs:
 
     steps:
       - name: Checkout chart repo
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@v7.0.1
         with:
           path: chart-repo
 
       - name: Checkout Hermes source
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@v7.0.1
         with:
           repository: NousResearch/hermes-agent
           ref: ${{ env.HERMES_SOURCE_REF }}
