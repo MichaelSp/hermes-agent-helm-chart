@@ -1,4 +1,4 @@
-FROM ghcr.io/astral-sh/uv:0.12.5-python3.13-trixie@sha256:7527c447eefbe4aa1ab927a0cd25c4f8224f9dd29ef53091679031ab3f069f66 AS uv_source
+FROM ghcr.io/astral-sh/uv:0.12.6-python3.13-trixie@sha256:560e241e8de441636af354a36227c6ffa28929d5435693e92f65ad911e4d04c9 AS uv_source
 
 # Node 22 LTS source stage. Debian trixie's bundled nodejs is pinned to 20.x
 # which reached EOL in April 2026 — we copy node + npm + corepack from the
