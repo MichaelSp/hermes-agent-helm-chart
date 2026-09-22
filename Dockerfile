@@ -8,7 +8,7 @@ FROM ghcr.io/astral-sh/uv:0.12.7-python3.13-trixie@sha256:767ae9f0bb33c54c8b6d1f
 # our Debian 13 (trixie, glibc 2.41) runtime.
 FROM node:24-bookworm-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553 AS node_source
 
-FROM debian:13.6@sha256:f324c7ff54321e8d9c588493a20244965938ce0aa50bbd1022d38010e9ffc4b1
+FROM debian:13.7@sha256:9cc080028c43b27d2074d63a5f9caf7166d731494965616c1a6d2827a004585c
 
 ENV PYTHONUNBUFFERED=1
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/hermes/.playwright
