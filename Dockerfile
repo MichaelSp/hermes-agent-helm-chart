@@ -6,7 +6,7 @@ FROM ghcr.io/astral-sh/uv:0.12.7-python3.13-trixie@sha256:767ae9f0bb33c54c8b6d1f
 # waiting for Debian 14 (forky, ~mid-2027). Bookworm-based slim image used
 # so the produced binary links against glibc 2.36, which runs cleanly on
 # our Debian 13 (trixie, glibc 2.41) runtime.
-FROM node:26-bookworm-slim@sha256:3fcc4609776fc12c0079831ca6020e250ca109b8d46243d504625d0af7efda93 AS node_source
+FROM node:26-bookworm-slim@sha256:0042e17d232a87a2cd485be1da7900fca4d10a4ad11b29e9285da1d2e54798c9 AS node_source
 
 FROM debian:13.8@sha256:3cda3ca472ce45507a5109c6a3907093e24d9ae67d55954c9a07a45665dafba2
 
